@@ -1,64 +1,122 @@
+import heapq
+from collections import Counter
+
 class Node:
-    def __init__(self, char=None, freq=0):
+    def __init__(self, char, freq):
         self.char = char
         self.freq = freq
         self.left = None
         self.right = None
 
-nodes = []
+    def __lt__(self, other):
+        return self.freq < other.freq
 
-def calculate_frequencies(word):
-    frequencies = {}
-    for char in word:
-        if char not in frequencies:
-            freq = word.count(char)
-            frequencies[char] = freq
-            nodes.append(Node(char, freq))
+def build_huffman_tree(data):
+    
+    if not data:
+        return None
 
-def build_huffman_tree():
-    while len(nodes) > 1:
-        nodes.sort(key=lambda x: x.freq)
-        left = nodes.pop(0)
-        right = nodes.pop(0)
+    frequency = Counter(data)
+    
+    priority_queue = []
+    for char, freq in frequency.items():
+        priority_queue.append(Node(char, freq))
+    
+    heapq.heapify(priority_queue) 
+
+    if len(priority_queue) == 1:
+        single_node = heapq.heappop(priority_queue)
+        root = Node(None, single_node.freq)
+        root.left = single_node
+        return root
+
+    while len(priority_queue) > 1:
+        left = heapq.heappop(priority_queue)
+        right = heapq.heappop(priority_queue)
+
+        merged_freq = left.freq + right.freq
+        new_node = Node(None, merged_freq)
+        new_node.left = left
+        new_node.right = right
+
+        heapq.heappush(priority_queue, new_node)
+
+    return priority_queue[0]
+
+def generate_codes(root, current_code="", huffman_codes=None):
+    if huffman_codes is None:
+        huffman_codes = {}
         
-        merged = Node(freq=left.freq + right.freq)
-        merged.left = left
-        merged.right = right
-        
-        nodes.append(merged)
-
-    return nodes[0]
-
-def generate_huffman_codes(node, current_code, codes):
-    if node is None:
+    if root is None:
         return
 
-    if node.char is not None:
-        codes[node.char] = current_code
+    if root.char is not None:
+        huffman_codes[root.char] = current_code
+        return
 
-    generate_huffman_codes(node.left, current_code + '0', codes)
-    generate_huffman_codes(node.right, current_code + '1', codes)
+    generate_codes(root.left, current_code + "0", huffman_codes)
+    generate_codes(root.right, current_code + "1", huffman_codes)
+    
+    return huffman_codes
 
-def huffman_encoding(word):
-    global nodes
-    nodes = []
-    calculate_frequencies(word)
-    root = build_huffman_tree()
+def huffman_encode(data):
+    
+    root = build_huffman_tree(data)
+    if not root:
+        return "", {}, None
+
     codes = {}
-    generate_huffman_codes(root, '', codes)
-    return codes
+    if root.char is None:
+        codes = generate_codes(root, huffman_codes={})
+    else:
+        codes = {root.char: '0'}
 
-def huffman_decoding(encoded_word, codes):
-    current_code = ''
-    decoded_chars = []
+    list_of_codes = [codes[char] for char in data]
 
-    # Invert the codes dictionary to get the reverse mapping
-    code_to_char = {v: k for k, v in codes.items()}
+    encoded_data = "".join(list_of_codes)
+    
+    return encoded_data, codes, root
 
-    for bit in encoded_word:
-        current_code += bit
-        if current_code in code_to_char:
-            decoded_chars.append(code_to_char[current_code])
-            current_code = ''
+def huffman_decode(encoded_data, root):
+    if not encoded_data or root is None:
+        return ""
 
-    return ''.join(decoded_chars)
+    decoded_data = []
+    current_node = root
+    
+    if current_node.char is not None:
+        return current_node.char * len(encoded_data)
+
+    for bit in encoded_data:
+        if bit == '0':
+            current_node = current_node.left
+        else: 
+            current_node = current_node.right
+
+        if current_node.char is not None:
+            decoded_data.append(current_node.char)
+            current_node = root
+            
+    return "".join(decoded_data)
+
+# Exemplo
+
+if __name__ == "__main__":
+    text = "lossless"
+
+    encoded_data, codes, tree_root = huffman_encode(text)
+
+    print("--- Algoritmo de Huffman ---")
+    print(f"Texto Original: '{text}'")
+    print("-" * 35)
+    print("1. Códigos Prefix-Free:")
+    print(codes)
+    print("-" * 35)
+    print("2. Dados Codificados:")
+    print(encoded_data)
+    print("-" * 35)
+    
+    decoded_text = huffman_decode(encoded_data, tree_root)
+    print("3. Resultado da Decodificação:")
+    print(f"Decodificado: '{decoded_text}'")
+    print(f"Sucesso na Decodificação? {decoded_text == text}")
